@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Next.js / React Build files
+.next/
+build/
+dist/
+
+# Environment variables (Keep your Supabase keys secret!)
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Compiled binaries (like your cpp-server exe)
+*.exe
+*.o
+.vercel
+.env*.local

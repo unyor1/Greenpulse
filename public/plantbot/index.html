@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plant Care Assistant</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="chat-widget">
+        <div class="widget-window open" id="widgetWindow">
+            <div class="widget-header">
+                <div class="widget-title">
+                    <span class="widget-title-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" role="img" focusable="false">
+                            <path d="M7 10h10M7 14h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            <path d="M20 15a4 4 0 0 1-4 4H9l-5 3V7a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v8Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                        </svg>
+                    </span>
+                    Plant Assistant
+                </div>
+                <button class="widget-close" id="widgetClose" title="Close">&times;</button>
+            </div>
+
+            <div class="widget-nav">
+                <button class="widget-tab-btn active" data-tab="chat">Chat</button>
+                <button class="widget-tab-btn" data-tab="plants">Plants</button>
+                <button class="widget-tab-btn" data-tab="diseases">Disease</button>
+            </div>
+
+            <div class="widget-content">
+                <div class="widget-tab active" id="chat-tab">
+                    <div class="widget-messages" id="chatMessages"></div>
+                    <div class="widget-input">
+                        <input
+                            type="text"
+                            id="chatInput"
+                            placeholder="Ask about plants..."
+                            autocomplete="off"
+                        >
+                        <button id="sendBtn" class="btn-send">Send</button>
+                    </div>
+                </div>
+
+                <div class="widget-tab" id="plants-tab">
+                    <div class="plants-search">
+                        <input
+                            type="text"
+                            id="plantsSearchInput"
+                            placeholder="Search plants..."
+                            autocomplete="off"
+                        >
+                        <button id="plantsSearchBtn" class="btn-search">Search</button>
+                        <button id="plantsClearBtn" class="btn-secondary">Clear</button>
+                    </div>
+                    <div id="plantsStatus" class="plants-status"></div>
+                    <div id="plantsList" class="plants-list"></div>
+                </div>
+
+                <div class="widget-tab" id="diseases-tab">
+                    <div class="disease-search">
+                        <input
+                            type="text"
+                            id="diseaseSearchInput"
+                            placeholder="Search diseases (name, symptoms, causes)"
+                            autocomplete="off"
+                        >
+                    </div>
+                    <div id="diseasesList" class="diseases-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>

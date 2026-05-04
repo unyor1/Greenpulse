@@ -1,0 +1,41 @@
+export const regions = [
+  "NCR",
+  "CAR",
+  "Region I",
+  "Region II",
+  "Region III",
+  "Region IV-A",
+  "Region IV-B",
+  "Region V",
+  "Region VI",
+  "Region VII",
+  "Region VIII",
+  "Region IX",
+  "Region X",
+  "Region XI",
+  "Region XII",
+  "Region XIII",
+  "BARMM",
+] as const;
+
+export type RegionName = (typeof regions)[number];
+
+export const regionCoordinates: Record<RegionName, { lat: number; lon: number }> = {
+  NCR: { lat: 14.5995, lon: 120.9842 },
+  CAR: { lat: 16.4023, lon: 120.596 },
+  "Region I": { lat: 16.0, lon: 120.35 },
+  "Region II": { lat: 17.6132, lon: 121.727 },
+  "Region III": { lat: 15.4817, lon: 120.5979 },
+  "Region IV-A": { lat: 14.1008, lon: 121.0794 },
+  "Region IV-B": { lat: 12.8797, lon: 121.774 },
+  "Region V": { lat: 13.4207, lon: 123.4137 },
+  "Region VI": { lat: 10.7202, lon: 122.5621 },
+  "Region VII": { lat: 10.3157, lon: 123.8854 },
+  "Region VIII": { lat: 11.2433, lon: 125.0049 },
+  "Region IX": { lat: 7.8731, lon: 123.8854 },
+  "Region X": { lat: 8.4542, lon: 124.6319 },
+  "Region XI": { lat: 7.1907, lon: 125.4553 },
+  "Region XII": { lat: 6.27, lon: 124.75 },
+  "Region XIII": { lat: 8.95, lon: 125.53 },
+  BARMM: { lat: 6.9568, lon: 124.2422 },
+};

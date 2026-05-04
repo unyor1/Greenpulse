@@ -1,0 +1,594 @@
+:root {
+    --primary: #27ae60;
+    --primary-dark: #229954;
+    --secondary: #3498db;
+    --accent: #e74c3c;
+    --light: #ecf0f1;
+    --dark: #2c3e50;
+    --gray: #95a5a6;
+    --radius: 12px;
+    --shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background: transparent;
+    color: var(--dark);
+    line-height: 1.6;
+}
+
+
+.chat-widget {
+    position: static;
+    height: 100%;
+    width: 100%;
+    font-family: inherit;
+}
+
+.widget-window {
+    display: flex;
+    position: static;
+    width: 100%;
+    max-width: 420px;
+    height: 100%;
+    background: white;
+    border-radius: 0;
+    box-shadow: none;
+    flex-direction: column;
+    overflow: hidden;
+    margin: 0 auto;
+}
+
+@media (max-width: 640px) {
+    .widget-window {
+        max-width: 92vw;
+    }
+}
+
+.widget-header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: white;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.widget-title {
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.widget-title-icon {
+    display: inline-flex;
+    height: 18px;
+    width: 18px;
+    align-items: center;
+    justify-content: center;
+}
+
+.widget-title-icon svg {
+    height: 18px;
+    width: 18px;
+    stroke: currentColor;
+}
+
+.widget-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity 0.3s;
+}
+
+.widget-close:hover {
+    opacity: 1;
+}
+
+.widget-nav {
+    display: flex;
+    background: #f9f9f9;
+    border-bottom: 1px solid #e0e0e0;
+    gap: 0;
+}
+
+.widget-tab-btn {
+    flex: 1;
+    background: none;
+    border: none;
+    padding: 12px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.3s;
+    border-bottom: 3px solid transparent;
+}
+
+.widget-tab-btn:hover {
+    background: #f0f0f0;
+}
+
+.widget-tab-btn.active {
+    background: white;
+    border-bottom-color: var(--primary);
+}
+
+.widget-content {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+}
+
+.widget-tab {
+    display: none;
+    width: 100%;
+    padding: 15px;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.widget-tab.active {
+    display: flex;
+}
+
+.container {
+    display: none;
+}
+
+.widget-messages {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.message {
+    display: flex;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message.user {
+    justify-content: flex-end;
+}
+
+.message.ai {
+    justify-content: flex-start;
+}
+
+.message-content {
+    max-width: 75%;
+    padding: 10px 12px;
+    border-radius: 12px;
+    word-wrap: break-word;
+    line-height: 1.4;
+    font-size: 13px;
+}
+
+.message.user .message-content {
+    background: var(--primary);
+    color: white;
+}
+
+.message.ai .message-content {
+    background: #e8e8e8;
+    color: var(--dark);
+}
+
+.widget-input {
+    display: flex;
+    gap: 8px;
+}
+
+.widget-input input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 13px;
+    transition: border-color 0.3s;
+}
+
+.widget-input input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.btn-send {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.3s;
+}
+
+.btn-send:hover {
+    background: var(--primary-dark);
+}
+
+.widget-tab textarea {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px;
+    font-family: inherit;
+    font-size: 13px;
+    resize: vertical;
+    transition: border-color 0.3s;
+    flex: 1;
+}
+
+.widget-tab textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.disease-search {
+    display: flex;
+    gap: 8px;
+}
+
+.disease-search input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 13px;
+    transition: border-color 0.3s;
+}
+
+.disease-search input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.btn-diagnose {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    transition: background 0.3s;
+}
+
+.btn-diagnose:hover {
+    background: var(--primary-dark);
+}
+
+.diseases-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.disease-card {
+    background: white;
+    border: 1px solid #e6e6e6;
+    border-radius: 10px;
+    padding: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+    cursor: pointer;
+}
+
+.disease-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary);
+}
+
+.disease-card-title {
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--dark);
+}
+
+.disease-card-hint {
+    margin-top: 10px;
+    font-size: 11px;
+    color: #6b7280;
+}
+
+.disease-details {
+    display: none;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #edf2f7;
+}
+
+.disease-card.expanded .disease-details {
+    display: block;
+}
+
+.disease-meta {
+    font-size: 12px;
+    color: #5f6b73;
+    line-height: 1.4;
+}
+
+.diagnosis-result {
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    max-height: 150px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    flex: 1;
+}
+
+.plants-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.plants-search {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    align-items: center;
+}
+
+.plants-search input {
+    grid-column: 1 / -1;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 13px;
+    transition: border-color 0.3s;
+}
+
+.plants-search input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.btn-search {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    transition: background 0.3s;
+}
+
+.btn-secondary {
+    background: white;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    transition: background 0.3s, color 0.3s, border-color 0.3s;
+}
+
+.btn-secondary:hover {
+    background: #f0f8ff;
+}
+
+    @media (max-width: 640px) {
+        .widget-window {
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        .widget-header {
+            padding: 12px 14px;
+        }
+
+        .widget-title {
+            font-size: 14px;
+            gap: 6px;
+        }
+
+        .widget-nav {
+            flex-wrap: nowrap;
+            gap: 0;
+            padding: 0 10px 10px;
+        }
+
+        .widget-tab-btn {
+            flex: 1;
+            min-width: 0;
+            padding: 10px 10px;
+            font-size: 12px;
+        }
+
+        .widget-content {
+            padding: 0 10px 10px;
+        }
+
+        .widget-input,
+        .plants-search,
+        .disease-search {
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .widget-input input,
+        .disease-search input,
+        .plants-search input {
+            width: 100%;
+        }
+
+        .btn-send,
+        .btn-search,
+        .btn-secondary,
+        .btn-diagnose {
+            width: 100%;
+        }
+
+        .widget-messages {
+            gap: 8px;
+        }
+
+        .message-content {
+            font-size: 12px;
+        }
+    }
+
+.plant-card {
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 13px;
+}
+
+.plant-card:hover {
+    background: #f0f0f0;
+    border-color: var(--primary);
+}
+
+.plant-card-title {
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: var(--primary);
+}
+
+.plant-info {
+    font-size: 12px;
+    color: var(--gray);
+    line-height: 1.4;
+}
+
+.plant-details {
+    display: none;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed #e0e0e0;
+    font-size: 12px;
+    color: #5f6b73;
+    line-height: 1.5;
+}
+
+.plant-card.expanded .plant-details {
+    display: block;
+}
+
+.plant-details-row {
+    margin-bottom: 6px;
+}
+
+.plant-details-row strong {
+    color: var(--dark);
+}
+
+.quick-tips {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.tip {
+    background: #f9f9f9;
+    border-left: 3px solid var(--primary);
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.tip strong {
+    color: var(--primary);
+}
+
+.loading {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(39, 174, 96, 0.3);
+    border-radius: 50%;
+    border-top-color: var(--primary);
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.widget-messages::-webkit-scrollbar,
+.plants-list::-webkit-scrollbar,
+.quick-tips::-webkit-scrollbar,
+.diagnosis-result::-webkit-scrollbar {
+    width: 6px;
+}
+
+.widget-messages::-webkit-scrollbar-track,
+.plants-list::-webkit-scrollbar-track,
+.quick-tips::-webkit-scrollbar-track,
+.diagnosis-result::-webkit-scrollbar-track {
+    background: #f9f9f9;
+}
+
+.widget-messages::-webkit-scrollbar-thumb,
+.plants-list::-webkit-scrollbar-thumb,
+.quick-tips::-webkit-scrollbar-thumb,
+.diagnosis-result::-webkit-scrollbar-thumb {
+    background: #ddd;
+    border-radius: 3px;
+}
+
+.widget-messages::-webkit-scrollbar-thumb:hover,
+.plants-list::-webkit-scrollbar-thumb:hover,
+.quick-tips::-webkit-scrollbar-thumb:hover,
+.diagnosis-result::-webkit-scrollbar-thumb:hover {
+    background: #bbb;
+}
+
+@media (max-width: 480px) {
+    .widget-window {
+        height: 100%;
+    }
+}

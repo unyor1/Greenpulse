@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌱 Plant Care Assistant</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Floating Chat Widget -->
+    <div class="chat-widget">
+        <!-- Widget Button -->
+        <button class="widget-toggle" id="widgetToggle" title="Chat with Plant Assistant">
+            <span class="widget-icon">🌱</span>
+        </button>
+
+        <!-- Widget Window -->
+        <div class="widget-window" id="widgetWindow">
+            <!-- Header -->
+            <div class="widget-header">
+                <div class="widget-title">
+                    <span>🌱</span> Plant Assistant
+                </div>
+                <button class="widget-close" id="widgetClose" title="Close">&times;</button>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="widget-nav">
+                <button class="widget-tab-btn active" data-tab="chat">Chat</button>
+                <button class="widget-tab-btn" data-tab="diagnose">Diagnose</button>
+                <button class="widget-tab-btn" data-tab="plants">Plants</button>
+                <button class="widget-tab-btn" data-tab="diseases">Disease</button>
+                <button class="widget-tab-btn" data-tab="guide">Guide</button>
+            </div>
+
+            <!-- Content -->
+            <div class="widget-content">
+                <!-- Chat Tab -->
+                <div class="widget-tab active" id="chat-tab">
+                    <div class="widget-messages" id="chatMessages"></div>
+                    <div class="widget-input">
+                        <input 
+                            type="text" 
+                            id="chatInput" 
+                            placeholder="Ask about plants..."
+                            autocomplete="off"
+                        >
+                        <button id="sendBtn" class="btn-send">→</button>
+                    </div>
+                </div>
+
+                <!-- Diagnose Tab -->
+                <div class="widget-tab" id="diagnose-tab">
+                    <textarea 
+                        id="symptomsInput" 
+                        placeholder="Describe plant symptoms..."
+                        rows="4"
+                    ></textarea>
+                    <button id="diagnoseBtn" class="btn-diagnose">Diagnose</button>
+                    <div id="diagnosisResult" class="diagnosis-result"></div>
+                </div>
+
+                <!-- Plants Tab -->
+                <div class="widget-tab" id="plants-tab">
+                    <div id="plantsList" class="plants-list"></div>
+                </div>
+
+                <!-- Disease Tab -->
+                <div class="widget-tab" id="diseases-tab">
+                    <div class="disease-search">
+                        <input
+                            type="text"
+                            id="diseaseSearchInput"
+                            placeholder="Search diseases (name, symptoms, causes)"
+                            autocomplete="off"
+                        >
+                    </div>
+                    <div id="diseasesList" class="diseases-list"></div>
+                </div>
+
+                <!-- Guide Tab -->
+                <div class="widget-tab" id="guide-tab">
+                    <div class="quick-tips">
+                        <div class="tip"><strong>💧 Water:</strong> When top 1-2" soil is dry</div>
+                        <div class="tip"><strong>☀️ Light:</strong> Bright indirect light</div>
+                        <div class="tip"><strong>🌡️ Temp:</strong> 65-75°F (18-24°C)</div>
+                        <div class="tip"><strong>🍽️ Feed:</strong> During growing season only</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Legacy container for compatibility -->
+    <div class="container">
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

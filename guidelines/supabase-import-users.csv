@@ -1,0 +1,4 @@
+
+-- PRIMARY KEY: user_id
+user_id,email,full_name,password_hash,created_at
+
