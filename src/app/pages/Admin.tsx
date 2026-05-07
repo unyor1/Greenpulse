@@ -36,6 +36,8 @@ export function Admin() {
   const [username, setUsername] = useState("");
   const [scheduleCount, setScheduleCount] = useState<number | null>(null);
   const [teamUserCount, setTeamUserCount] = useState<number | null>(null);
+  const [teamUsers, setTeamUsers] = useState<Array<{ username?: string }>>([]);
+  const [activeUserCount, setActiveUserCount] = useState<number>(0);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState("");
@@ -127,7 +129,10 @@ export function Admin() {
 
       try {
         const users = await getUsersByRole("user").catch(() => []);
-        if (!cancelled) setTeamUserCount(Array.isArray(users) ? users.length : 0);
+        if (!cancelled) {
+          setTeamUsers(Array.isArray(users) ? users : []);
+          setTeamUserCount(Array.isArray(users) ? users.length : 0);
+        }
       } catch {
         if (!cancelled) setTeamUserCount(0);
       }
@@ -155,6 +160,30 @@ export function Admin() {
     void loadAudit();
     return () => { cancelled = true; };
   }, []);
+
+  // Calculate active users based on recent login activity (only users with 'user' role)
+  useEffect(() => {
+    const now = Date.now();
+    const oneHourAgo = now - 60 * 60 * 1000;
+    const activeUsers = new Set<string>();
+
+    // Get list of usernames with 'user' role
+    const userRoleUsernames = new Set(
+      teamUsers.map((user) => user.username).filter((username): username is string => !!username)
+    );
+
+    // Count only users with 'user' role that have logged in within the last hour
+    auditLogs.forEach((audit) => {
+      if (audit.event === "login" && audit.username && userRoleUsernames.has(audit.username)) {
+        const auditTime = new Date(audit.createdAt).getTime();
+        if (auditTime >= oneHourAgo) {
+          activeUsers.add(audit.username);
+        }
+      }
+    });
+
+    setActiveUserCount(activeUsers.size);
+  }, [auditLogs, teamUsers]);
 
   // Load dashboard sensors and device state
   useEffect(() => {
@@ -288,6 +317,13 @@ export function Admin() {
                 note: teamUserCount === null ? "Loading..." : "",
                 icon: Users,
                 tone: "from-amber-500 to-amber-400",
+              },
+              {
+                title: "Active Users",
+                value: String(activeUserCount),
+                note: activeUserCount > 0 ? "Online now" : "No active users",
+                icon: Users,
+                tone: "from-green-500 to-green-400",
               },
             ].map((card) => (
               <article key={card.title} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
