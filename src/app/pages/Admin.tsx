@@ -158,7 +158,16 @@ export function Admin() {
       }
     };
     void loadAudit();
-    return () => { cancelled = true; };
+    
+    // Refresh audit logs every 30 seconds to update active users count
+    const interval = setInterval(() => {
+      void loadAudit();
+    }, 30000);
+
+    return () => { 
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   // Calculate active users based on recent login activity (only users with 'user' role)
