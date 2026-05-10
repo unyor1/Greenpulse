@@ -417,7 +417,7 @@ export function Controls() {
           pumpActive = true;
         }
       } else if (pumpAutoEnabled) {
-        // Hysteresis: turn on when below `pumpOnThreshold`, stay on until reaching `pumpOffThreshold`.
+        // Hysteresis: turn on when soil <= pumpOnThreshold, stay on until soil >= pumpOffThreshold.
         const currentlyOn = Boolean(waterPumpActive);
         if (currentlyOn) {
           pumpActive = soilMoisture < pumpOffThreshold;
@@ -767,16 +767,18 @@ export function Controls() {
   // Draft values for settings dialog — apply on Save
   const [draftPumpOn, setDraftPumpOn] = useState<number>(pumpOnThreshold);
   const [draftPumpOff, setDraftPumpOff] = useState<number>(pumpOffThreshold);
+  const [draftPumpAutoEnabled, setDraftPumpAutoEnabled] = useState<boolean>(pumpAutoEnabled);
 
   useEffect(() => {
     if (openSettingsDialog) {
       setDraftPumpOn(pumpOnThreshold);
       setDraftPumpOff(pumpOffThreshold);
+      setDraftPumpAutoEnabled(pumpAutoEnabled);
       setDraftShortRunEnabled(pumpShortRunConditionEnabled);
       setDraftShortRunThreshold(pumpShortRunTriggerThreshold);
       setDraftShortRunDurationMinutes(pumpShortRunDurationMinutes);
     }
-  }, [openSettingsDialog, pumpOnThreshold, pumpOffThreshold, pumpShortRunConditionEnabled, pumpShortRunTriggerThreshold, pumpShortRunDurationMinutes]);
+  }, [openSettingsDialog, pumpOnThreshold, pumpOffThreshold, pumpAutoEnabled, pumpShortRunConditionEnabled, pumpShortRunTriggerThreshold, pumpShortRunDurationMinutes]);
 
   const thresholdsValid = (openSettingsDialog ? draftPumpOn < draftPumpOff : pumpOnThreshold < pumpOffThreshold);
 
@@ -1076,33 +1078,9 @@ export function Controls() {
               <div className="flex items-center justify-between">
                 <div className="text-sm text-gray-700">Enable automatic watering</div>
                 <Switch
-                  checked={pumpAutoEnabled}
+                  checked={draftPumpAutoEnabled}
                   onCheckedChange={(val) => {
-                    const enabled = Boolean(val);
-                    setPumpAutoEnabled(enabled);
-                    if (enabled) {
-                      setUserOverride((prev) => ({ ...prev, waterpump: false }));
-                    }
-                    if (!enabled) {
-                      (async () => {
-                        setWaterPumpActive(false);
-                        prevDesiredRef.current.waterpump = null;
-                        if (hasBlynkConfig()) {
-                          try {
-                            await updateBlynkVirtualPin(BLYNK_PIN_WATERPUMP, false);
-                          } catch (err) {
-                            console.error("Failed to update Blynk water pump pin.", err);
-                          }
-                        }
-                        if (hasScheduleBackendConfig()) {
-                          try {
-                            await setBackendWaterPumpState(false);
-                          } catch (err) {
-                            console.error("Failed to update pump state in Supabase.", err);
-                          }
-                        }
-                      })();
-                    }
+                    setDraftPumpAutoEnabled(Boolean(val));
                   }}
                 />
               </div>
@@ -1111,7 +1089,7 @@ export function Controls() {
               <Label className="text-sm mb-2 block">Automatic Watering Thresholds</Label>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <div className="text-xs text-gray-600 mb-1">Trigger when moisture &lt;</div>
+                  <div className="text-xs text-gray-600 mb-1">Trigger when moisture ≤</div>
                   <input
                     type="number"
                     min={0}
@@ -1124,7 +1102,7 @@ export function Controls() {
                   <div className="text-xs text-gray-500">(percent)</div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-600 mb-1">Stop when moisture &gt;</div>
+                  <div className="text-xs text-gray-600 mb-1">Stop when moisture ≥</div>
                   <input
                     type="number"
                     min={0}
@@ -1176,7 +1154,7 @@ export function Controls() {
                 </div>
               </div>
               {!thresholdsValid && (
-                <div className="text-xs text-red-600 mt-2">On threshold must be less than Off threshold.</div>
+                <div className="text-xs text-red-600 mt-2">Trigger threshold must be less than Stop threshold.</div>
               )}
               <div className="flex gap-2 mt-3">
                 <Button
@@ -1196,25 +1174,51 @@ export function Controls() {
                     }
 
                     try {
-                      setPumpOnThreshold(draftPumpOn);
-                      setPumpOffThreshold(draftPumpOff);
-                      setPumpShortRunConditionEnabled(draftShortRunEnabled);
-                      setPumpShortRunTriggerThreshold(draftShortRunThreshold);
-                      setPumpShortRunDurationMinutes(draftShortRunDurationMinutes);
-
                       if (!userId) {
                         throw new Error("User not authenticated");
                       }
 
+                      // Save to database first
                       await upsertUserPumpSettings({
                         id: userId,
-                        pumpAutoEnabled,
+                        pumpAutoEnabled: draftPumpAutoEnabled,
                         pumpOnThreshold: draftPumpOn,
                         pumpOffThreshold: draftPumpOff,
                         shortRunConditionEnabled: draftShortRunEnabled,
                         shortRunTriggerThreshold: draftShortRunThreshold,
                         shortRunDurationMinutes: draftShortRunDurationMinutes,
                       });
+
+                      // Only update local state AFTER successful database save
+                      setPumpAutoEnabled(draftPumpAutoEnabled);
+                      setPumpOnThreshold(draftPumpOn);
+                      setPumpOffThreshold(draftPumpOff);
+                      setPumpShortRunConditionEnabled(draftShortRunEnabled);
+                      setPumpShortRunTriggerThreshold(draftShortRunThreshold);
+                      setPumpShortRunDurationMinutes(draftShortRunDurationMinutes);
+                      
+                      // If disabled, turn off the pump
+                      if (!draftPumpAutoEnabled) {
+                        setWaterPumpActive(false);
+                        prevDesiredRef.current.waterpump = null;
+                        if (hasBlynkConfig()) {
+                          try {
+                            await updateBlynkVirtualPin(BLYNK_PIN_WATERPUMP, false);
+                          } catch (err) {
+                            console.error("Failed to update Blynk water pump pin.", err);
+                          }
+                        }
+                        if (hasScheduleBackendConfig()) {
+                          try {
+                            await setBackendWaterPumpState(false);
+                          } catch (err) {
+                            console.error("Failed to update pump state in Supabase.", err);
+                          }
+                        }
+                      } else {
+                        // If enabled, clear manual override so auto mode takes control
+                        setUserOverride((prev) => ({ ...prev, waterpump: false }));
+                      }
 
                       toast.success("Settings saved.");
                     } catch (err) {
