@@ -361,6 +361,9 @@ export function Controls() {
       const pestActive = Boolean(pestMatch);
 
       if (pestMatch) {
+        if (userOverride.pest) {
+          setUserOverride((prev) => ({ ...prev, pest: false }));
+        }
         const remainingSeconds = getRemainingSeconds(
           pestMatch.secondsNow,
           toSeconds(pestMatch.schedule.startTime),
@@ -396,8 +399,13 @@ export function Controls() {
         }
       };
 
-      if (pumpMatch) {
+      if (userOverride.waterpump) {
+        // Manual override: keep current pump state
+        setPumpScheduleUntil(null);
+        pumpActive = waterPumpActive;
+      } else if (pumpMatch) {
         if (shouldShortRunForSchedule) {
+          setPumpScheduleUntil(null);
           if (shortRunRef.current.key !== scheduleKey) {
             const until = Date.now() + getShortRunDurationMs(pumpShortRunDurationMinutes);
             shortRunRef.current = { key: scheduleKey, until };
@@ -500,6 +508,7 @@ export function Controls() {
     soilMoisture,
     setHumidifierActive,
     setWaterPumpActive,
+    setUserOverride,
     userOverride,
     pumpAutoEnabled,
     waterPumpActive,
@@ -526,12 +535,15 @@ export function Controls() {
 
   const pumpShortRemaining = getRemainingMs(pumpShortRunUntil);
   const pestScheduleRemaining = getRemainingMs(pestScheduleUntil);
-  const pumpScheduleRemaining = getRemainingMs(pumpScheduleUntil);
+  const isPumpShortRunActive = pumpShortRemaining !== null;
+  const pumpScheduleRemaining = !isPumpShortRunActive
+    ? getRemainingMs(pumpScheduleUntil)
+    : null;
   const pestTimerLabel = pestScheduleRemaining
     ? `Schedule ends in: ${formatRemaining(pestScheduleRemaining)}`
     : "Auto mode";
-  const pumpTimerLabel = pumpShortRemaining
-    ? `Short run: ${formatRemaining(pumpShortRemaining)}`
+  const pumpTimerLabel = isPumpShortRunActive
+    ? `Short run: ${formatRemaining(pumpShortRemaining ?? 0)}`
     : pumpScheduleRemaining
     ? `Schedule ends in: ${formatRemaining(pumpScheduleRemaining)}`
     : "Auto mode";
@@ -766,10 +778,7 @@ export function Controls() {
     }
   }, [openSettingsDialog, pumpOnThreshold, pumpOffThreshold, pumpShortRunConditionEnabled, pumpShortRunTriggerThreshold, pumpShortRunDurationMinutes]);
 
-
   const thresholdsValid = (openSettingsDialog ? draftPumpOn < draftPumpOff : pumpOnThreshold < pumpOffThreshold);
-
-  // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-4 w-full min-w-0 flex flex-col min-h-0">
@@ -864,7 +873,7 @@ export function Controls() {
               onToggle={() => {
                 const next = !waterPumpActive;
                 setWaterPumpActive(next);
-                setUserOverride((prev) => ({ ...prev, waterpump: true }));
+                setUserOverride((prev) => ({ ...prev, waterpump: !prev.waterpump }));
                 void (async () => {
                   if (hasBlynkConfig()) {
                     try {
@@ -1071,6 +1080,9 @@ export function Controls() {
                   onCheckedChange={(val) => {
                     const enabled = Boolean(val);
                     setPumpAutoEnabled(enabled);
+                    if (enabled) {
+                      setUserOverride((prev) => ({ ...prev, waterpump: false }));
+                    }
                     if (!enabled) {
                       (async () => {
                         setWaterPumpActive(false);
