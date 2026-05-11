@@ -1,8 +1,20 @@
-import { createContext, useContext, useState, useEffect, ReactNode, SetStateAction } from "react";
+import { createContext, useContext, useState, useEffect, useRef, ReactNode, SetStateAction } from "react";
 import { useLocation } from "react-router-dom";
-import { getBackendSensorData, getUserPumpSettings, getDashboardSensors, getDashboardSensorLogs, DashboardSensorConfig } from "../services/backend";
+import {
+  getBackendSensorData,
+  getUserPumpSettings,
+  getDashboardSensors,
+  getDashboardSensorLogs,
+  getBackendSchedules,
+  hasScheduleBackendConfig,
+  setBackendHumidifierState,
+  setBackendWaterPumpState,
+  DashboardSensorConfig,
+  type BackendSchedule,
+} from "../services/backend";
 import { getCurrentUserProfile } from "../services/auth";
 import { toast } from "sonner";
+import { hasBlynkConfig, updateBlynkVirtualPin } from "../services/blynk";
 
 const env = ((import.meta as any).env ?? {}) as Record<string, string | undefined>;
 const DEFAULT_WEATHER_LAT = Number(env.VITE_WEATHER_LAT ?? 14.5176);
@@ -173,6 +185,24 @@ export function SensorProvider({ children }: { children: ReactNode }) {
   const [historicalData, setHistoricalData] = useState<SensorData[]>([]);
   const [mergedHistoricalData, setMergedHistoricalData] = useState<SensorData[]>([]);
   const [pumpSettingsLoaded, setPumpSettingsLoaded] = useState(false);
+  const [activeSchedules, setActiveSchedules] = useState<BackendSchedule[]>([]);
+  const userOverrideRef = useRef(userOverride);
+  const scheduleDesiredRef = useRef<Record<BackendSchedule["device"], boolean | null>>({
+    pest: null,
+    waterpump: null,
+  });
+
+  useEffect(() => {
+    userOverrideRef.current = userOverride;
+  }, [userOverride]);
+
+  useEffect(() => {
+    scheduleDesiredRef.current.pest = null;
+  }, [userOverride.pest]);
+
+  useEffect(() => {
+    scheduleDesiredRef.current.waterpump = null;
+  }, [userOverride.waterpump]);
   const [notificationState, setNotificationState] = useState<{
     dateKey?: string;
     lightNotified: boolean;
@@ -298,6 +328,174 @@ export function SensorProvider({ children }: { children: ReactNode }) {
       clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    if (!hasScheduleBackendConfig()) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadSchedules = async () => {
+      try {
+        const records = await getBackendSchedules();
+        if (!cancelled) {
+          setActiveSchedules(records);
+        }
+      } catch (err) {
+        console.error("Failed to load schedules for background control", err);
+      }
+    };
+
+    void loadSchedules();
+    const interval = setInterval(() => void loadSchedules(), 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!pumpSettingsLoaded) {
+      return;
+    }
+    if (!hasScheduleBackendConfig()) {
+      return;
+    }
+
+    const weekdayMap: Record<string, number> = {
+      Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6,
+    };
+
+    const getLocalDaySeconds = () => {
+      const now = new Date();
+      const scheduleDay = (now.getDay() + 6) % 7;
+      const secondsNow = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+      return { scheduleDay, secondsNow };
+    };
+
+    const getZonedDaySeconds = (timezone?: string) => {
+      if (!timezone) return getLocalDaySeconds();
+      try {
+        const formatter = new Intl.DateTimeFormat("en-US", {
+          timeZone: timezone,
+          weekday: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        });
+        const parts = formatter.formatToParts(new Date());
+        const weekday = parts.find((p) => p.type === "weekday")?.value ?? "";
+        const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
+        const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+        const second = Number(parts.find((p) => p.type === "second")?.value ?? 0);
+        return {
+          scheduleDay: weekdayMap[weekday] ?? getLocalDaySeconds().scheduleDay,
+          secondsNow: hour * 3600 + minute * 60 + second,
+        };
+      } catch {
+        return getLocalDaySeconds();
+      }
+    };
+
+    const toSeconds = (time: string) => {
+      const [hours, minutes, seconds = "0"] = time.split(":");
+      return Number(hours) * 3600 + Number(minutes) * 60 + Number(seconds);
+    };
+
+    const isWithinRange = (current: number, start: number, end: number) => {
+      if (start === end) return false;
+      if (start < end) return current >= start && current < end;
+      return current >= start || current < end;
+    };
+
+    const getActiveSchedule = (device: BackendSchedule["device"]) => {
+      for (const schedule of activeSchedules) {
+        if (schedule.device !== device) continue;
+        if (!schedule.days?.length) continue;
+        const { scheduleDay, secondsNow } = getZonedDaySeconds(schedule.timezone);
+        if (!schedule.days.includes(scheduleDay)) continue;
+        if (!isWithinRange(secondsNow, toSeconds(schedule.startTime), toSeconds(schedule.endTime))) continue;
+        return true;
+      }
+      return false;
+    };
+
+    let cancelled = false;
+
+    const evaluateSchedules = async () => {
+      if (cancelled) return;
+
+      const pestMatch = getActiveSchedule("pest");
+      const pumpMatch = getActiveSchedule("waterpump");
+      const { pest: pestOverride, waterpump: waterpumpOverride } = userOverrideRef.current;
+
+      try {
+        if (!pestOverride) {
+          setHumidifierActive(pestMatch);
+          const previous = scheduleDesiredRef.current.pest;
+          if (previous === null || previous !== pestMatch) {
+            scheduleDesiredRef.current.pest = pestMatch;
+            if (hasScheduleBackendConfig()) {
+              try {
+                await setBackendHumidifierState(pestMatch);
+              } catch (err) {
+                console.error("Failed writing pest state to Supabase.", err);
+              }
+            }
+            if (hasBlynkConfig()) {
+              try {
+                await updateBlynkVirtualPin("V3", pestMatch);
+              } catch (err) {
+                console.error("Failed to update Blynk pest pin.", err);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to evaluate pest schedule", err);
+      }
+
+      try {
+        if (!waterpumpOverride) {
+          setWaterPumpActive(pumpMatch);
+          const previous = scheduleDesiredRef.current.waterpump;
+          if (previous === null || previous !== pumpMatch) {
+            scheduleDesiredRef.current.waterpump = pumpMatch;
+            if (hasScheduleBackendConfig()) {
+              try {
+                await setBackendWaterPumpState(pumpMatch);
+              } catch (err) {
+                console.error("Failed writing pump state to Supabase.", err);
+              }
+            }
+            if (hasBlynkConfig()) {
+              try {
+                await updateBlynkVirtualPin("V2", pumpMatch);
+              } catch (err) {
+                console.error("Failed to update Blynk water pump pin.", err);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to evaluate water pump schedule", err);
+      }
+    };
+
+    void evaluateSchedules();
+    const interval = setInterval(() => void evaluateSchedules(), 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [
+    activeSchedules,
+    pumpSettingsLoaded,
+    setHumidifierActive,
+    setWaterPumpActive,
+  ]);
 
   // Store historical data every 10 seconds
   useEffect(() => {
