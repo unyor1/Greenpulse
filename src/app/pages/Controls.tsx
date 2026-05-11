@@ -112,10 +112,15 @@ export function Controls() {
     pest: null,
     waterpump: null,
   });
+  const pestOverrideRef = useRef(false);
   const shortRunRef = useRef<{ key: string | null; until: number | null }>({
     key: null,
     until: null,
   });
+
+  useEffect(() => {
+    pestOverrideRef.current = userOverride.pest;
+  }, [userOverride.pest]);
 
   // Short-run trigger setting (persisted in SensorContext)
   const [draftShortRunEnabled, setDraftShortRunEnabled] = useState<boolean>(pumpShortRunConditionEnabled);
@@ -361,9 +366,6 @@ export function Controls() {
       const pestActive = Boolean(pestMatch);
 
       if (pestMatch) {
-        if (userOverride.pest) {
-          setUserOverride((prev) => ({ ...prev, pest: false }));
-        }
         const remainingSeconds = getRemainingSeconds(
           pestMatch.secondsNow,
           toSeconds(pestMatch.schedule.startTime),
@@ -371,6 +373,10 @@ export function Controls() {
         );
         setPestScheduleUntil(Date.now() + remainingSeconds * 1000);
       } else {
+        if (pestOverrideRef.current) {
+          pestOverrideRef.current = false;
+          setUserOverride((prev) => ({ ...prev, pest: false }));
+        }
         setPestScheduleUntil(null);
       }
 
@@ -436,7 +442,7 @@ export function Controls() {
 
       // ── Pest / Humidifier ─────────────────────────────────────────────────
       try {
-        if (!userOverride.pest) {
+        if (!pestOverrideRef.current) {
           setHumidifierActive(pestActive);
           const prev = prevDesiredRef.current.pest;
           const shouldUpdate = prev === null || prev !== pestActive;
@@ -832,6 +838,7 @@ export function Controls() {
               onToggle={() => {
                 const next = !humidifierActive;
                 setHumidifierActive(next);
+                pestOverrideRef.current = true;
                 setUserOverride((prev) => ({ ...prev, pest: true }));
                 void (async () => {
                   if (hasBlynkConfig()) {
