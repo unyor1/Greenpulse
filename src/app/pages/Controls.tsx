@@ -89,6 +89,8 @@ export function Controls() {
     pumpSettingsLoaded,
     userOverride,
     setUserOverride,
+    markLocalUpdate,
+    isLocalUpdatePending,
   } = useSensor();
 
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -189,6 +191,114 @@ export function Controls() {
     }
   };
 
+  const handlePestToggle = async (next: boolean) => {
+    setHumidifierActive(next);
+
+    let backendSuccess = false;
+    let blynkSuccess = false;
+    let confirmed = next;
+
+    if (hasScheduleBackendConfig()) {
+      try {
+        await setBackendHumidifierState(next);
+        backendSuccess = true;
+        try {
+          const confirmedState = await getBackendHumidifierState();
+          if (typeof confirmedState === "boolean") {
+            confirmed = confirmedState;
+          }
+        } catch {
+          toast.error("Unable to confirm pest state from Supabase.");
+        }
+      } catch {
+        backendSuccess = false;
+      }
+    } else {
+      backendSuccess = true;
+    }
+
+    if (hasBlynkConfig()) {
+      try {
+        await updateBlynkVirtualPin(BLYNK_PIN_PEST, confirmed);
+        blynkSuccess = true;
+      } catch (err) {
+        console.error("Failed to update Blynk pest pin.", err);
+        toast.error("Failed to update Blynk pest pin.");
+      }
+    } else {
+      blynkSuccess = true;
+    }
+
+    const success = backendSuccess || blynkSuccess;
+    if (!success) {
+      setHumidifierActive(!next);
+      setUserOverride((prev) => ({ ...prev, pest: false }));
+      toast.error("Failed to update pest control.");
+      return;
+    }
+
+    await trackAudit({
+      event: "manual_switch",
+      device: "pest",
+      state: confirmed,
+      details: `Pest Control manually turned ${confirmed ? "ON" : "OFF"}${backendSuccess ? "" : " (unconfirmed)"}`,
+    });
+  };
+
+  const handleWaterPumpToggle = async (next: boolean) => {
+    setWaterPumpActive(next);
+
+    let backendSuccess = false;
+    let blynkSuccess = false;
+    let confirmed = next;
+
+    if (hasScheduleBackendConfig()) {
+      try {
+        await setBackendWaterPumpState(next);
+        backendSuccess = true;
+        try {
+          const confirmedState = await getBackendWaterPumpState();
+          if (typeof confirmedState === "boolean") {
+            confirmed = confirmedState;
+          }
+        } catch {
+          toast.error("Unable to confirm pump state from Supabase.");
+        }
+      } catch {
+        backendSuccess = false;
+      }
+    } else {
+      backendSuccess = true;
+    }
+
+    if (hasBlynkConfig()) {
+      try {
+        await updateBlynkVirtualPin(BLYNK_PIN_WATERPUMP, confirmed);
+        blynkSuccess = true;
+      } catch (err) {
+        console.error("Failed to update Blynk water pump pin.", err);
+        toast.error("Failed to update Blynk water pump pin.");
+      }
+    } else {
+      blynkSuccess = true;
+    }
+
+    const success = backendSuccess || blynkSuccess;
+    if (!success) {
+      setWaterPumpActive(!next);
+      setUserOverride((prev) => ({ ...prev, waterpump: false }));
+      toast.error("Failed to update pump control.");
+      return;
+    }
+
+    await trackAudit({
+      event: "manual_switch",
+      device: "waterpump",
+      state: confirmed,
+      details: `Water Pump manually turned ${confirmed ? "ON" : "OFF"}${backendSuccess ? "" : " (unconfirmed)"}`,
+    });
+  };
+
 
   // ─── Load schedules from Supabase on mount ────────────────────────────────────
   useEffect(() => {
@@ -234,10 +344,10 @@ export function Controls() {
         ]);
         if (disposed) return;
 
-        if (typeof humidifierState === "boolean" && !userOverride.pest) {
+        if (typeof humidifierState === "boolean" && !userOverride.pest && !isLocalUpdatePending("pest")) {
           setHumidifierActive(humidifierState);
         }
-        if (typeof pumpState === "boolean" && !userOverride.waterpump) {
+        if (typeof pumpState === "boolean" && !userOverride.waterpump && !isLocalUpdatePending("waterpump")) {
           setWaterPumpActive(pumpState);
         }
       } catch {
@@ -247,7 +357,7 @@ export function Controls() {
 
     void loadDeviceState();
     return () => { disposed = true; };
-  }, [setHumidifierActive, setWaterPumpActive, userOverride, pumpSettingsLoaded]);
+  }, [setHumidifierActive, setWaterPumpActive, userOverride, pumpSettingsLoaded, isLocalUpdatePending]);
 
   // ─── Poll Supabase every 5s to pick up Blynk-triggered state changes ─────────
   // When the user taps V2/V3 in the Blynk app, the ESP32 writes to Supabase.
@@ -266,10 +376,10 @@ export function Controls() {
         ]);
         if (disposed) return;
 
-        if (!userOverride.pest && typeof humidifierState === "boolean") {
+        if (!userOverride.pest && typeof humidifierState === "boolean" && !isLocalUpdatePending("pest")) {
           setHumidifierActive(humidifierState);
         }
-        if (!userOverride.waterpump && typeof pumpState === "boolean") {
+        if (!userOverride.waterpump && typeof pumpState === "boolean" && !isLocalUpdatePending("waterpump")) {
           setWaterPumpActive(pumpState);
         }
       } catch {
@@ -283,11 +393,12 @@ export function Controls() {
       clearInterval(interval);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setHumidifierActive, setWaterPumpActive, userOverride, pumpSettingsLoaded]);
+  }, [setHumidifierActive, setWaterPumpActive, userOverride, pumpSettingsLoaded, isLocalUpdatePending]);
 
   // ─── Schedule evaluator — runs every 2s ──────────────────────────────────────
   useEffect(() => {
     if (!pumpSettingsLoaded) return;
+
     const weekdayMap: Record<string, number> = {
       Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6,
     };
@@ -295,8 +406,7 @@ export function Controls() {
     const getLocalDaySeconds = () => {
       const now = new Date();
       const scheduleDay = (now.getDay() + 6) % 7;
-      const secondsNow =
-        now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+      const secondsNow = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
       return { scheduleDay, secondsNow };
     };
 
@@ -356,6 +466,13 @@ export function Controls() {
       return null;
     };
 
+    const clearPumpShortRun = () => {
+      if (shortRunRef.current.key !== null || shortRunRef.current.until !== null) {
+        shortRunRef.current = { key: null, until: null };
+        setPumpShortRunUntil(null);
+      }
+    };
+
     let disposed = false;
 
     const evaluateSchedules = async () => {
@@ -364,6 +481,11 @@ export function Controls() {
       const pestMatch = getActiveSchedule("pest");
       const pumpMatch = getActiveSchedule("waterpump");
       const pestActive = Boolean(pestMatch);
+      const scheduleKey = pumpMatch ? `${pumpMatch.schedule.id}-${pumpMatch.scheduleDay}` : null;
+      const shouldShortRunForSchedule =
+        Boolean(pumpMatch) &&
+        pumpShortRunConditionEnabled &&
+        soilMoisture >= pumpShortRunTriggerThreshold;
 
       if (pestMatch) {
         const remainingSeconds = getRemainingSeconds(
@@ -373,10 +495,6 @@ export function Controls() {
         );
         setPestScheduleUntil(Date.now() + remainingSeconds * 1000);
       } else {
-        if (pestOverrideRef.current) {
-          pestOverrideRef.current = false;
-          setUserOverride((prev) => ({ ...prev, pest: false }));
-        }
         setPestScheduleUntil(null);
       }
 
@@ -391,62 +509,46 @@ export function Controls() {
         setPumpScheduleUntil(null);
       }
 
-      let pumpActive = false;
-      const scheduleKey = pumpMatch ? `${pumpMatch.schedule.id}-${pumpMatch.scheduleDay}` : null;
-      const shouldShortRunForSchedule =
-        Boolean(pumpMatch) &&
-        pumpShortRunConditionEnabled &&
-        soilMoisture >= pumpShortRunTriggerThreshold;
+      let targetPumpActive = false;
 
-      const clearPumpShortRun = () => {
-        if (shortRunRef.current.key !== null || shortRunRef.current.until !== null) {
-          shortRunRef.current = { key: null, until: null };
-          setPumpShortRunUntil(null);
-        }
-      };
-
-      if (userOverride.waterpump) {
-        // Manual override: keep current pump state
-        setPumpScheduleUntil(null);
-        pumpActive = waterPumpActive;
+      if (userOverride.waterpump || isLocalUpdatePending("waterpump")) {
+        targetPumpActive = waterPumpActive;
       } else if (pumpMatch) {
         if (shouldShortRunForSchedule) {
-          setPumpScheduleUntil(null);
-          if (shortRunRef.current.key !== scheduleKey) {
+          if (
+            shortRunRef.current.key !== scheduleKey ||
+            Date.now() >= (shortRunRef.current.until ?? 0)
+          ) {
             const until = Date.now() + getShortRunDurationMs(pumpShortRunDurationMinutes);
             shortRunRef.current = { key: scheduleKey, until };
             setPumpShortRunUntil(until);
           }
-          pumpActive = Date.now() < (shortRunRef.current.until ?? 0);
+          targetPumpActive = Date.now() < (shortRunRef.current.until ?? 0);
         } else {
           clearPumpShortRun();
-          pumpActive = true;
+          targetPumpActive = true;
         }
       } else if (pumpAutoEnabled) {
-        // Hysteresis: turn on when soil <= pumpOnThreshold, stay on until soil >= pumpOffThreshold.
         const currentlyOn = Boolean(waterPumpActive);
-        if (currentlyOn) {
-          pumpActive = soilMoisture < pumpOffThreshold;
-        } else {
-          pumpActive = soilMoisture <= pumpOnThreshold;
-        }
-
-        if (pumpActive) {
+        targetPumpActive = currentlyOn
+          ? soilMoisture < pumpOffThreshold
+          : soilMoisture <= pumpOnThreshold;
+        if (targetPumpActive) {
           clearPumpShortRun();
         }
       } else {
         clearPumpShortRun();
       }
 
-      console.debug("Schedules eval", { pestActive, pumpActive });
+      console.debug("Schedules eval", { pestActive, targetPumpActive });
 
-      // ── Pest / Humidifier ─────────────────────────────────────────────────
       try {
-        if (!pestOverrideRef.current) {
-          setHumidifierActive(pestActive);
+        if (!userOverride.pest && !isLocalUpdatePending("pest")) {
+          if (humidifierActive !== pestActive) {
+            setHumidifierActive(pestActive);
+          }
           const prev = prevDesiredRef.current.pest;
-          const shouldUpdate = prev === null || prev !== pestActive;
-          if (shouldUpdate) {
+          if (prev === null || prev !== pestActive) {
             prevDesiredRef.current.pest = pestActive;
             if (hasScheduleBackendConfig()) {
               try {
@@ -471,19 +573,19 @@ export function Controls() {
         }
       } catch {}
 
-      // ── Water Pump ────────────────────────────────────────────────────────
       try {
-        if (!userOverride.waterpump) {
-          setWaterPumpActive(pumpActive);
+        if (!userOverride.waterpump && !isLocalUpdatePending("waterpump")) {
+          if (waterPumpActive !== targetPumpActive) {
+            setWaterPumpActive(targetPumpActive);
+          }
           const prev = prevDesiredRef.current.waterpump;
-          const shouldUpdate = prev === null || prev !== pumpActive;
-          if (shouldUpdate) {
-            prevDesiredRef.current.waterpump = pumpActive;
+          if (prev === null || prev !== targetPumpActive) {
+            prevDesiredRef.current.waterpump = targetPumpActive;
             if (hasScheduleBackendConfig()) {
               try {
-                await setBackendWaterPumpState(pumpActive);
+                await setBackendWaterPumpState(targetPumpActive);
                 if (prev !== null) {
-                  toast.success(`Schedule: Pump ${pumpActive ? "ON" : "OFF"} (Supabase)`);
+                  toast.success(`Schedule: Pump ${targetPumpActive ? "ON" : "OFF"} (Supabase)`);
                 }
               } catch {
                 console.error("Failed writing pump state to Supabase.");
@@ -492,7 +594,7 @@ export function Controls() {
             }
             if (hasBlynkConfig()) {
               try {
-                await updateBlynkVirtualPin(BLYNK_PIN_WATERPUMP, pumpActive);
+                await updateBlynkVirtualPin(BLYNK_PIN_WATERPUMP, targetPumpActive);
               } catch (err) {
                 console.error("Failed to update Blynk water pump pin.", err);
                 toast.error("Failed to update Blynk water pump pin.");
@@ -514,7 +616,6 @@ export function Controls() {
     soilMoisture,
     setHumidifierActive,
     setWaterPumpActive,
-    setUserOverride,
     userOverride,
     pumpAutoEnabled,
     waterPumpActive,
@@ -522,6 +623,8 @@ export function Controls() {
     pumpOffThreshold,
     pumpShortRunConditionEnabled,
     pumpShortRunTriggerThreshold,
+    pumpShortRunDurationMinutes,
+    isLocalUpdatePending,
   ]);
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -837,35 +940,11 @@ export function Controls() {
                 timerLabel={pestTimerLabel}
               onToggle={() => {
                 const next = !humidifierActive;
-                setHumidifierActive(next);
+                markLocalUpdate("pest", 5000);
                 pestOverrideRef.current = true;
                 setUserOverride((prev) => ({ ...prev, pest: true }));
-                void (async () => {
-                  if (hasBlynkConfig()) {
-                    try {
-                      await updateBlynkVirtualPin(BLYNK_PIN_PEST, next);
-                    } catch (err) {
-                      console.error("Failed to update Blynk pest pin.", err);
-                      toast.error("Failed to update Blynk pest pin.");
-                    }
-                  }
-
-                  if (hasScheduleBackendConfig()) {
-                    try {
-                      await setBackendHumidifierState(next);
-                    } catch {
-                      console.error("Failed to update pest state in Supabase.");
-                      toast.error("Failed to update pest state in Supabase.");
-                    }
-                  }
-
-                  await trackAudit({
-                    event: "manual_switch",
-                    device: "pest",
-                    state: next,
-                    details: `Pest Control manually turned ${next ? "ON" : "OFF"}`,
-                  });
-                })();
+                setHumidifierActive(next);
+                void handlePestToggle(next);
               }}
             />
           </div>
@@ -881,34 +960,10 @@ export function Controls() {
                 timerLabel={pumpTimerLabel}
               onToggle={() => {
                 const next = !waterPumpActive;
+                markLocalUpdate("waterpump", 5000);
+                setUserOverride((prev) => ({ ...prev, waterpump: true }));
                 setWaterPumpActive(next);
-                setUserOverride((prev) => ({ ...prev, waterpump: !prev.waterpump }));
-                void (async () => {
-                  if (hasBlynkConfig()) {
-                    try {
-                      await updateBlynkVirtualPin(BLYNK_PIN_WATERPUMP, next);
-                    } catch (err) {
-                      console.error("Failed to update Blynk water pump pin.", err);
-                      toast.error("Failed to update Blynk water pump pin.");
-                    }
-                  }
-
-                  if (hasScheduleBackendConfig()) {
-                    try {
-                      await setBackendWaterPumpState(next);
-                    } catch {
-                      console.error("Failed to update pump state in Supabase.");
-                      toast.error("Failed to update pump state in Supabase.");
-                    }
-                  }
-
-                  await trackAudit({
-                    event: "manual_switch",
-                    device: "waterpump",
-                    state: next,
-                    details: `Water Pump manually turned ${next ? "ON" : "OFF"}`,
-                  });
-                })();
+                void handleWaterPumpToggle(next);
               }}
             />
           </div>
