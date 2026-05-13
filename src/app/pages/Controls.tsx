@@ -237,7 +237,6 @@ export function Controls() {
       return;
     }
 
-    setUserOverride((prev) => ({ ...prev, pest: false }));
     await trackAudit({
       event: "manual_switch",
       device: "pest",
@@ -292,7 +291,6 @@ export function Controls() {
       return;
     }
 
-    setUserOverride((prev) => ({ ...prev, waterpump: false }));
     await trackAudit({
       event: "manual_switch",
       device: "waterpump",
