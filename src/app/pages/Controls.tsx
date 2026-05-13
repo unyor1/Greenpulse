@@ -510,20 +510,27 @@ export function Controls() {
       }
 
       let targetPumpActive = false;
+      const now = Date.now();
+      const shortRunActive = now < (shortRunRef.current.until ?? 0);
+      const scheduleSuppressed =
+        pumpMatch &&
+        shortRunRef.current.key === scheduleKey &&
+        !shortRunActive;
 
       if (userOverride.waterpump || isLocalUpdatePending("waterpump")) {
         targetPumpActive = waterPumpActive;
       } else if (pumpMatch) {
-        if (shouldShortRunForSchedule) {
-          if (
-            shortRunRef.current.key !== scheduleKey ||
-            Date.now() >= (shortRunRef.current.until ?? 0)
-          ) {
-            const until = Date.now() + getShortRunDurationMs(pumpShortRunDurationMinutes);
-            shortRunRef.current = { key: scheduleKey, until };
-            setPumpShortRunUntil(until);
-          }
-          targetPumpActive = Date.now() < (shortRunRef.current.until ?? 0);
+        if (shortRunActive) {
+          targetPumpActive = true;
+        } else if (shortRunRef.current.key === scheduleKey) {
+          // A short run already occurred for this active schedule; ignore the remaining
+          // schedule window until it ends, even after the short run timer expires.
+          targetPumpActive = false;
+        } else if (shouldShortRunForSchedule) {
+          const until = now + getShortRunDurationMs(pumpShortRunDurationMinutes);
+          shortRunRef.current = { key: scheduleKey, until };
+          setPumpShortRunUntil(until);
+          targetPumpActive = true;
         } else {
           clearPumpShortRun();
           targetPumpActive = true;
